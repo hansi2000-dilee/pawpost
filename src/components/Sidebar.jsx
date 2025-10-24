@@ -1,57 +1,93 @@
 import React from 'react';
-import { Drawer, Box, Avatar, Typography, List, ListItem, ListItemButton, ListItemIcon, ListItemText } from '@mui/material';
-import { Home, Person, AccountBox } from '@mui/icons-material';
+import {
+  Drawer,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  Toolbar,
+  Typography,
+  Box,
+  Divider
+} from '@mui/material';
+import { Home, AccountCircle, ExitToApp, Edit } from '@mui/icons-material';
+import PetsIcon from '@mui/icons-material/Pets';
 import { Link } from 'react-router-dom';
-import { auth } from '../firebase';
 
 const drawerWidth = 240;
 
-const Sidebar = () => {
-  const user = auth.currentUser;
-
-  return (
-    <Drawer
-      variant="permanent"
-      sx={{
-        width: drawerWidth,
-        flexShrink: 0,
-        [`& .MuiDrawer-paper`]: { width: drawerWidth, boxSizing: 'border-box' },
-      }}
-    >
-      <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', mt: 4 }}>
-        <Avatar src={user?.photoURL} sx={{ width: 80, height: 80, mb: 1 }}>
-          {user?.displayName?.substring(0, 1)}
-        </Avatar>
-        <Typography variant="h6">Welcome,</Typography>
-        <Typography variant="body1" sx={{fontWeight: 'bold'}}>{user?.displayName || 'User'}</Typography>
-      </Box>
-      <List>
-        <ListItem disablePadding>
-          <ListItemButton component={Link} to="/home">
-            <ListItemIcon>
-              <Home />
-            </ListItemIcon>
-            <ListItemText primary="Home" />
-          </ListItemButton>
+const Sidebar = ({ mobileOpen, handleDrawerToggle, user, onLogout }) => {
+  const drawer = (
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <Toolbar sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', p: 2, backgroundColor: 'primary.main', color: 'white' }}>
+        <PetsIcon sx={{ mr: 2, fontSize: '1.8rem' }} />
+        <Typography variant="h6" noWrap sx={{ fontWeight: 'bold' }}>
+          ForeverPaws
+        </Typography>
+      </Toolbar>
+      <Divider />
+      <List sx={{ flexGrow: 1 }}>
+        <ListItem button component={Link} to="/home" sx={{ p: 2 }}>
+          <ListItemIcon>
+            <Home />
+          </ListItemIcon>
+          <ListItemText primary="Home" />
         </ListItem>
-        <ListItem disablePadding>
-          <ListItemButton component={Link} to="/profile">
-            <ListItemIcon>
-              <Person />
-            </ListItemIcon>
-            <ListItemText primary="User Profile" />
-          </ListItemButton>
+        <ListItem button component={Link} to="/my-account" sx={{ p: 2 }}>
+          <ListItemIcon>
+            <AccountCircle />
+          </ListItemIcon>
+          <ListItemText primary="My Account" />
         </ListItem>
-        <ListItem disablePadding>
-          <ListItemButton component={Link} to="/my-account">
-            <ListItemIcon>
-              <AccountBox />
-            </ListItemIcon>
-            <ListItemText primary="My Account" />
-          </ListItemButton>
+        <ListItem button component={Link} to="/profile" sx={{ p: 2 }}>
+          <ListItemIcon>
+            <Edit />
+          </ListItemIcon>
+          <ListItemText primary="Update Profile" />
         </ListItem>
       </List>
-    </Drawer>
+      <Divider />
+      <List>
+        <ListItem button onClick={onLogout} sx={{ p: 2 }}>
+          <ListItemIcon>
+            <ExitToApp />
+          </ListItemIcon>
+          <ListItemText primary="Logout" />
+        </ListItem>
+      </List>
+    </Box>
+  );
+
+  return (
+    <Box
+      component="nav"
+      sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 } }}
+    >
+      <Drawer
+        variant="temporary"
+        open={mobileOpen}
+        onClose={handleDrawerToggle}
+        ModalProps={{
+          keepMounted: true, // Better open performance on mobile.
+        }}
+        sx={{
+          display: { xs: 'block', sm: 'none' },
+          '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth, backgroundColor: '#f5f5f5' },
+        }}
+      >
+        {drawer}
+      </Drawer>
+      <Drawer
+        variant="permanent"
+        sx={{
+          display: { xs: 'none', sm: 'block' },
+          '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth, backgroundColor: '#f5f5f5' },
+        }}
+        open
+      >
+        {drawer}
+      </Drawer>
+    </Box>
   );
 };
 

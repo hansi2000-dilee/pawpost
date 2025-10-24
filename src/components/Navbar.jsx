@@ -11,6 +11,7 @@ import {
   Box,
 } from "@mui/material";
 import { Link } from "react-router-dom";
+import PetsIcon from '@mui/icons-material/Pets';
 
 const Navbar = ({ user, onLogout }) => {
   const [anchorEl, setAnchorEl] = useState(null);
@@ -26,9 +27,10 @@ const Navbar = ({ user, onLogout }) => {
   return (
     <AppBar position="static">
       <Toolbar>
+        <PetsIcon sx={{ mr: 1 }} />
         <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
           <Link to="/" style={{ textDecoration: "none", color: "inherit" }}>
-            Pappiespaw
+            ForeverPaws
           </Link>
         </Typography>
         {user ? (

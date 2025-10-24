@@ -17,8 +17,9 @@ import {
 } from "@mui/material";
 import { Favorite, Comment, MoreVert, Add } from "@mui/icons-material";
 import { auth, database } from "../firebase";
-import { ref, onValue, update } from "firebase/database";
+import { ref, onValue, update, push } from "firebase/database";
 import PostForm from "../components/PostForm";
+import CommentSection from "../components/CommentSection";
 import { formatDistanceToNow } from "date-fns";
 
 const style = {
@@ -38,10 +39,15 @@ const HomePage = () => {
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [userProfile, setUserProfile] = useState(null);
+  const [selectedPost, setSelectedPost] = useState(null);
+  const [commentCounts, setCommentCounts] = useState({});
   const user = auth.currentUser;
 
   const handleOpen = () => setOpen(true);
-  const handleClose = () => setOpen(false);
+  const handleClose = () => {
+    setOpen(false);
+    setSelectedPost(null);
+  };
 
   useEffect(() => {
     if (user) {
@@ -58,20 +64,32 @@ const HomePage = () => {
   useEffect(() => {
     const postsRef = ref(database, "posts");
     const unsubscribe = onValue(postsRef, (snapshot) => {
-        const postsData = [];
-        snapshot.forEach((childSnapshot) => {
-            postsData.push({ id: childSnapshot.key, ...childSnapshot.val() });
-        });
-        setPosts(postsData.sort((a, b) => {
-            if (a.timestamp && b.timestamp) {
-                return new Date(b.timestamp) - new Date(a.timestamp);
-            }
-            return 0;
-        }));
-        setLoading(false);
+      const postsData = [];
+      snapshot.forEach((childSnapshot) => {
+        postsData.push({ id: childSnapshot.key, ...childSnapshot.val() });
+      });
+      setPosts(
+        postsData.sort((a, b) => {
+          if (a.timestamp && b.timestamp) {
+            return new Date(b.timestamp) - new Date(a.timestamp);
+          }
+          return 0;
+        })
+      );
+      setLoading(false);
     });
     return () => unsubscribe();
-}, []);
+  }, []);
+
+  useEffect(() => {
+    posts.forEach((post) => {
+      const commentsRef = ref(database, `comments/${post.id}`);
+      const unsubscribe = onValue(commentsRef, (snapshot) => {
+        setCommentCounts((prev) => ({ ...prev, [post.id]: snapshot.size }));
+      });
+      return () => unsubscribe();
+    });
+  }, [posts]);
 
   const handleLike = async (postId) => {
     if (!user) return;
@@ -80,31 +98,14 @@ const HomePage = () => {
     const updates = {};
     const currentLikes = post.likes || [];
     if (currentLikes.includes(userId)) {
-      updates[`posts/${postId}/likes`] = currentLikes.filter((id) => id !== userId);
+      updates[`posts/${postId}/likes`] = currentLikes.filter(
+        (id) => id !== userId
+      );
     } else {
       updates[`posts/${postId}/likes`] = [...currentLikes, userId];
     }
     await update(ref(database), updates);
   };
-
-  const handleComment = async (postId, comment) => {
-    if (!user || !userProfile) return;
-    const post = posts.find((p) => p.id === postId);
-    const updates = {};
-    const currentComments = post.comments || [];
-    updates[`posts/${postId}/comments`] = [
-      ...currentComments,
-      {
-        text: comment,
-        uid: user.uid,
-        displayName: userProfile.displayName,
-        photoURL: userProfile.photoURL,
-        timestamp: new Date().toISOString(),
-      },
-    ];
-    await update(ref(database), updates);
-  };
-
 
   return (
     <Container maxWidth="lg">
@@ -114,7 +115,11 @@ const HomePage = () => {
             Welcome, {userProfile.displayName}!
           </Typography>
         )}
-        <Typography variant="h5" component="h2" sx={{ mb: 4, fontWeight: "bold" }}>
+        <Typography
+          variant="h5"
+          component="h2"
+          sx={{ mb: 4, fontWeight: "bold" }}
+        >
           Puppy Feed
         </Typography>
 
@@ -128,9 +133,19 @@ const HomePage = () => {
             <Add />
           </Fab>
         )}
-        <Modal open={open} onClose={handleClose}>
+        <Modal open={open && !selectedPost} onClose={handleClose}>
           <Box sx={style}>
             <PostForm userProfile={userProfile} handleClose={handleClose} />
+          </Box>
+        </Modal>
+
+        <Modal open={!!selectedPost} onClose={handleClose}>
+          <Box sx={style}>
+            <CommentSection
+              postId={selectedPost}
+              userProfile={userProfile}
+              postOwnerId={posts.find(p => p.id === selectedPost)?.uid}
+            />
           </Box>
         </Modal>
 
@@ -139,32 +154,65 @@ const HomePage = () => {
             <CircularProgress />
           </Box>
         ) : posts.length === 0 ? (
-          <Typography sx={{ textAlign: "center", mt: 4, color: "text.secondary" }}>
+          <Typography
+            sx={{ textAlign: "center", mt: 4, color: "text.secondary" }}
+          >
             No posts yet. Be the first to share a photo of your puppy!
           </Typography>
         ) : (
           <Grid container spacing={2}>
             {posts.map((post) => (
               <Grid item key={post.id} xs={12} sm={6} md={4}>
-                <Card sx={{ borderRadius: 4, boxShadow: "0 8px 32px 0 rgba(0,0,0,0.1)" }}>
+                <Card
+                  sx={{
+                    borderRadius: 4,
+                    boxShadow: "0 8px 32px 0 rgba(0,0,0,0.1)",
+                  }}
+                >
                   <CardHeader
                     avatar={<Avatar src={post.photoURL}>{post.displayName?.substring(0, 1)}</Avatar>}
                     title={<Typography sx={{ fontWeight: "bold" }}>{post.displayName}</Typography>}
                     subheader={post.timestamp ? formatDistanceToNow(new Date(post.timestamp), { addSuffix: true }) : "Just now"}
                     action={<IconButton><MoreVert /></IconButton>}
                   />
-                  {post.imageUrl && <img src={post.imageUrl} alt={post.caption} style={{ width: "100%", height: "200px", objectFit: "cover" }} />}
+                  {post.imageUrl && (
+                    <img
+                      src={post.imageUrl}
+                      alt={post.caption}
+                      style={{
+                        width: "100%",
+                        height: "200px",
+                        objectFit: "cover",
+                      }}
+                    />
+                  )}
                   <CardContent>
                     <Typography variant="body2">{post.caption}</Typography>
                   </CardContent>
                   <CardActions disableSpacing>
-                    <IconButton onClick={() => handleLike(post.id)} disabled={!user}>
-                      <Favorite color={user && post.likes?.includes(user.uid) ? "error" : "inherit"} />
-                      <Typography sx={{ ml: 1, fontSize: "0.8rem" }}>{post.likes?.length || 0}</Typography>
+                    <IconButton
+                      onClick={() => handleLike(post.id)}
+                      disabled={!user}
+                    >
+                      <Favorite
+                        color={
+                          user && post.likes?.includes(user.uid)
+                            ? "error"
+                            : "inherit"
+                        }
+                      />
+                      <Typography sx={{ ml: 1, fontSize: "0.8rem" }}>
+                        {post.likes?.length || 0}
+                      </Typography>
                     </IconButton>
-                    <IconButton disabled={!user}>
+                    <IconButton
+                      onClick={() => setSelectedPost(post.id)}
+                      disabled={!user}
+                    >
                       <Comment />
-                      <Typography sx={{ ml: 1, fontSize: "0.8rem" }}>{post.comments?.length || 0}</Typography>
+                      <Typography sx={{ ml: 1, fontSize: "0.8rem" }}>
+                        {commentCounts[post.id] || 0}
+                      </Typography>
                     </IconButton>
                   </CardActions>
                 </Card>
